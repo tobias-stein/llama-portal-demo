@@ -1,0 +1,222 @@
+<!doctype html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Admin · Bookings</title><link rel="preconnect" href="https://fonts.googleapis.com"/><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/><link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;600&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet"/><link rel="stylesheet" href="css/admin.css"><script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script><style>/* ── Invitation Code button ── */
+    .btn-invite {
+      display: flex;
+      align-items: center;
+      gap: .4rem;
+      padding: .35rem .8rem;
+      border: 1px solid var(--border2);
+      border-radius: 6px;
+      background: none;
+      color: var(--text-dim);
+      font-family: 'DM Mono', monospace;
+      font-size: .65rem;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: border-color .2s, color .2s, opacity .2s;
+    }
+    .btn-invite:hover { border-color: var(--accent); color: var(--accent); }
+    .btn-invite.loading { opacity: .5; cursor: wait; pointer-events: none; }
+    .btn-invite.loading svg { animation: spin .8s linear infinite; }
+
+    /* ── Invitation modal ── */
+    .invite-modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(7, 10, 18, .78);
+      backdrop-filter: blur(5px);
+      z-index: 70;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .25s;
+    }
+    .invite-modal-overlay.open {
+      opacity: 1;
+      pointer-events: all;
+    }
+    .invite-modal {
+      width: 440px;
+      max-width: calc(100vw - 2rem);
+      background: var(--surface);
+      border: 1px solid var(--border2);
+      border-radius: 18px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      transform: translateY(20px) scale(.96);
+      transition: transform .28s cubic-bezier(.16,1,.3,1);
+      position: relative;
+      box-shadow: 0 24px 64px rgba(0,0,0,.55);
+    }
+    .invite-modal-overlay.open .invite-modal {
+      transform: translateY(0) scale(1);
+    }
+    .invite-modal::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, transparent, var(--accent), var(--accent2), transparent);
+      opacity: .8;
+    }
+
+    /* Header */
+    .invite-modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1.2rem 1.4rem 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .invite-modal-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.25rem;
+      font-weight: 400;
+      letter-spacing: .04em;
+      color: var(--text);
+    }
+    .invite-modal-sub {
+      font-size: .6rem;
+      letter-spacing: .1em;
+      color: var(--text-dim);
+      margin-top: .15rem;
+      text-transform: uppercase;
+    }
+    .invite-modal-close {
+      width: 28px; height: 28px;
+      border: 1px solid var(--border2);
+      border-radius: 6px;
+      background: none;
+      color: var(--text-dim);
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: border-color .2s, color .2s;
+      flex-shrink: 0;
+    }
+    .invite-modal-close:hover { border-color: var(--error); color: var(--error); }
+    .invite-modal-close svg { width: 13px; height: 13px; }
+
+    /* Body */
+    .invite-modal-body {
+      padding: 1.4rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.4rem;
+    }
+
+    /* Code row */
+    .invite-code-row {
+      display: flex;
+      align-items: center;
+      gap: .75rem;
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border2);
+      border-radius: 10px;
+      padding: .75rem 1rem;
+    }
+    .invite-code-label {
+      font-size: .55rem;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      white-space: nowrap;
+    }
+    #invite-code-display {
+      font-family: 'DM Mono', monospace;
+      font-size: 1.3rem;
+      letter-spacing: .22em;
+      color: var(--accent);
+      flex: 1;
+      text-align: center;
+    }
+    .invite-copy-btn {
+      display: flex;
+      align-items: center;
+      gap: .35rem;
+      padding: .38rem .7rem;
+      border: 1px solid var(--border2);
+      border-radius: 7px;
+      background: none;
+      color: var(--text-dim);
+      font-family: 'DM Mono', monospace;
+      font-size: .6rem;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: border-color .2s, color .2s;
+      flex-shrink: 0;
+    }
+    .invite-copy-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .invite-copy-btn.copied { border-color: var(--confirmed); color: var(--confirmed); }
+
+    /* QR section */
+    .invite-qr-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: .75rem;
+      width: 100%;
+    }
+    .invite-qr-label {
+      font-size: .58rem;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      align-self: flex-start;
+    }
+    #invite-qr {
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid var(--border2);
+      background: var(--surface2);
+      padding: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #invite-qr canvas,
+    #invite-qr img { display: block; }
+
+    /* Footer actions */
+    .invite-modal-footer {
+      display: flex;
+      gap: .65rem;
+      padding: 0 1.4rem 1.4rem;
+    }
+    .invite-footer-btn {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: .4rem;
+      padding: .65rem;
+      border-radius: 8px;
+      font-family: 'DM Mono', monospace;
+      font-size: .65rem;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: filter .15s, transform .1s;
+      text-decoration: none;
+    }
+    .invite-footer-btn:hover  { filter: brightness(1.15); transform: translateY(-1px); }
+    .invite-footer-btn:active { transform: none; }
+    .invite-footer-btn.copy-link {
+      background: rgba(94,231,200,.1);
+      border: 1px solid var(--confirmed);
+      color: var(--confirmed);
+    }
+    .invite-footer-btn.copy-link.copied {
+      border-color: var(--accent2);
+      color: var(--accent2);
+    }
+    .invite-footer-btn.open-link {
+      background: rgba(59,130,246,.1);
+      border: 1px solid var(--accent2);
+      color: var(--accent2);
+    }</style><script defer="defer" src="964.bundle.js"></script><script defer="defer" src="359.bundle.js"></script><script defer="defer" src="900.bundle.js"></script><script defer="defer" src="admin.bundle.js"></script></head><body><div class="topbar"><div class="brand"><img src="img/llama.svg" alt="Llama Portal Icon" class="brand-icon"> <span class="brand-name">Llama&nbsp;Portal</span></div><span class="topbar-center">Booking Management</span><div class="topbar-right"><div class="legend"><div class="legend-pill"><div class="legend-dot pending"></div>Pending</div><div class="legend-pill"><div class="legend-dot confirmed"></div>Confirmed</div><div class="legend-pill"><div class="legend-dot rejected"></div>Rejected</div><div class="legend-pill"><div class="legend-dot cancelled"></div>Cancelled</div></div><div class="view-toggle" id="view-toggle"><button class="view-toggle-btn active" id="btn-view-timeline" title="Timeline view"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width:11px;height:11px"><rect x="3" y="4" width="18" height="3" rx="1"/><rect x="3" y="10" width="13" height="3" rx="1"/><rect x="3" y="16" width="16" height="3" rx="1"/></svg> Timeline</button> <button class="view-toggle-btn" id="btn-view-calendar" title="Annual calendar view"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width:11px;height:11px"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/></svg> Calendar</button></div><button class="btn-invite" id="btn-invite"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width:12px;height:12px"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> Invite</button> <button class="btn-units" id="btn-units"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width:12px;height:12px"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> Manage Rooms</button> <button class="btn-today" id="btn-today">Today</button></div><div class="user-pill"><span class="dot"></span> <span id="user-email-display">Anonymous</span></div></div><div class="shell"><div class="timeline-wrap" id="timeline-wrap"><div class="tl-header"><div class="tl-corner"><span>Room</span></div><div class="tl-days-scroll" id="hdr-scroll"><div class="tl-months-row" id="months-row"></div><div class="tl-days-row" id="days-row"></div></div></div><div class="tl-body"><div class="unit-rail" id="unit-rail"></div><div class="grid-scroll" id="grid-scroll"><div class="grid-inner" id="grid-inner"></div></div></div></div><div class="calendar-wrap" id="calendar-wrap"><div class="cal-toolbar"><button class="cal-year-nav" id="cal-prev-year"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><polyline points="15 18 9 12 15 6"/></svg></button><div class="cal-year-display"><span class="cal-year-label" id="cal-year-label">2026</span> <span class="cal-year-sub">Annual Overview</span></div><button class="cal-year-nav" id="cal-next-year"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><polyline points="9 18 15 12 9 6"/></svg></button><div class="cal-legend"><span class="cal-legend-label">Occupancy</span><div class="cal-legend-bar"><span class="cal-legend-end">Low</span><div class="cal-legend-gradient"></div><span class="cal-legend-end">Full</span></div></div></div><div class="cal-grid" id="cal-grid"></div></div><div class="detail-panel" id="detail-panel"><div class="panel-header"><div><div class="panel-title" id="panel-title">Booking</div><div style="font-size:.62rem;letter-spacing:.08em;color:var(--text-dim);margin-top:.25rem" id="panel-unit-name"></div></div><button class="panel-close" id="panel-close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div><div class="panel-body"><div class="panel-section"><div class="section-label">Status</div><div id="panel-status-badge" class="status-badge pending"><div class="status-badge-dot"></div><span id="panel-status-text">Pending</span></div></div><div class="panel-section"><div class="section-label">Guest</div><div class="info-row"><span class="info-key">Name</span><span class="info-val" id="pi-name">—</span></div><div class="info-row"><span class="info-key">Email</span><span class="info-val" id="pi-email" style="font-size:.65rem">—</span></div><div class="info-row"><span class="info-key">Guests</span><span class="info-val" id="pi-guests">—</span></div><div class="info-row"><span class="info-key">Requested</span><span class="info-val" id="pi-created">—</span></div></div><div class="panel-section" id="notes-section" style="display:none"><div class="section-label">Guest notes</div><div style="font-size:.7rem;color:var(--text-dim);letter-spacing:.03em;line-height:1.5" id="pi-notes"></div></div><div class="panel-section"><div class="section-label">Booking period</div><div class="panel-field"><label>Check-in</label><input type="date" id="edit-checkin"/></div><div class="nights-badge" id="edit-nights">—</div><div class="panel-field"><label>Check-out</label><input type="date" id="edit-checkout"/></div></div><div class="panel-actions" id="panel-actions"><button class="act-btn save" id="act-save">Save date changes</button> <button class="act-btn accept" id="act-accept">Accept &amp; confirm</button> <button class="act-btn reject" id="act-reject">Reject request</button> <button class="act-btn cancel-booking" id="act-cancel">Cancel booking</button></div></div></div></div><div class="units-modal-overlay" id="units-modal-overlay"><div class="units-modal" id="units-modal"><div class="um-header"><div><div class="um-title">Manage Rooms</div><div style="font-size:.6rem;letter-spacing:.1em;color:var(--text-dim);margin-top:.2rem">Create, edit or remove bookable rooms</div></div><div style="display:flex;align-items:center;gap:.6rem"><button class="um-close" id="um-close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div></div><div class="um-body"><div class="um-col-heads"><span>ID</span><span>Room Name</span> <span style="text-align:center">Capacity</span> <span style="text-align:center">Bookings</span> <span></span><span></span></div><div class="um-list" id="um-list"></div><div class="um-add-section"><div class="um-add-label">Add new room</div><div class="um-add-grid"><input class="um-add-input" id="new-unit-name" placeholder="Room name (e.g. Van 123)"/> <input class="um-add-input um-cap-input" id="new-unit-cap" type="number" min="1" max="99" placeholder="Cap."/> <button class="um-add-btn" id="um-add-btn">+ Add Room</button></div></div></div></div></div><div class="invite-modal-overlay" id="invite-modal-overlay"><div class="invite-modal"><div class="invite-modal-header"><div><div class="invite-modal-title">Invitation Code</div><div class="invite-modal-sub">One-time · Valid for 7 days</div></div><button class="invite-modal-close" id="invite-modal-close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div><div class="invite-modal-body"><div class="invite-code-row"><span class="invite-code-label">Code</span> <span id="invite-code-display">—</span> <button class="invite-copy-btn" id="invite-copy-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy</button></div><div class="invite-qr-section"><span class="invite-qr-label">Magic link QR code</span><div id="invite-qr"></div></div></div><div class="invite-modal-footer"><button class="invite-footer-btn copy-link" id="invite-copy-link-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg> Copy link</button> <a class="invite-footer-btn open-link" id="invite-open-link" href="#" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg> Open link</a></div></div></div><div class="toast" id="toast"></div><script type="module" src="js/admin.js"></script></body></html>
