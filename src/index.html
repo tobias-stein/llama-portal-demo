@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sign In</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;600&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- ── Magic link overlay (hidden unless ?code= detected by JS) ── -->
+<div id="magic-link-overlay" class="hidden">
+  <div class="ml-icon">✉︎</div>
+  <p id="magic-link-status">Verifying your invitation link…</p>
+  <div id="magic-link-spinner"></div>
+  <p id="magic-link-error" class="hidden"></p>
+  <button id="magic-link-retry" class="hidden"
+          onclick="window.location.href = window.location.pathname">
+    Return to sign in
+  </button>
+</div>
+
+<div class="page">
+
+  <!-- Left: branding -->
+  <div class="left">
+    <div class="brand">
+      <span class="brand-wordmark">Llama&nbsp;Portal</span>
+      <div class="llama-wrap">
+        <img src="img/llama.svg" alt="Llama Portal Logo" class="llama-svg">
+      </div>
+    </div>
+
+    <p class="tagline">Your gateway to<br/><em>Lamaland</em></p>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- Right: login form -->
+  <div class="right">
+    <div class="card">
+      <h1 class="card-title">Welcome</h1>
+      <p class="card-sub">SIGN IN TO CONTINUE</p>
+
+      <!-- Mode toggle -->
+      <div class="mode-toggle" id="mode-toggle">
+        <button class="toggle-btn active" id="btn-password" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <rect x="5" y="11" width="14" height="10" rx="2"/>
+            <path d="M8 11V7a4 4 0 0 1 8 0v4"/>
+          </svg>
+          Password
+        </button>
+        <button class="toggle-btn" id="btn-otc" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <rect x="3" y="6" width="18" height="13" rx="2"/>
+            <path d="M3 10h18M8 6V4M16 6V4"/>
+          </svg>
+          Invitation Code
+        </button>
+      </div>
+
+      <div class="panels">
+
+        <!-- Panel A: Password -->
+        <div class="panel" id="panel-password">
+          <form id="login-form" novalidate>
+            <div class="field">
+              <label for="email">Username</label>
+              <div class="input-wrap">
+                <input type="email" id="email" name="Username"
+                       placeholder="username" autocomplete="email" required />
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <circle cx="12" cy="8" r="4"/>
+                  <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+                </svg>
+              </div>
+            </div>
+            <div class="field">
+              <label for="password">Password</label>
+              <div class="input-wrap">
+                <input type="password" id="password" name="password"
+                       placeholder="••••••••" autocomplete="current-password" required />
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <rect x="5" y="11" width="14" height="10" rx="2"/>
+                  <path d="M8 11V7a4 4 0 0 1 8 0v4"/>
+                </svg>
+              </div>
+            </div>
+            <div class="error-msg" id="error-password" role="alert"></div>
+            <button type="submit" class="btn" id="submit-password">
+              <span class="btn-text">Sign In</span>
+              <div class="spinner"></div>
+            </button>
+          </form>
+        </div>
+
+        <!-- Panel B: One-Time Code -->
+        <div class="panel hidden" id="panel-otc">
+          <form id="otc-form" novalidate>
+            <div class="field">
+              <label for="otc-code">Invitation Code</label>
+              <div class="input-wrap code-input-wrap">
+                <input type="text" id="otc-code" name="otc-code"
+                       placeholder="XXXX-XXXX-XXXX"
+                       autocomplete="off"
+                       autocapitalize="characters"
+                       spellcheck="false"
+                       maxlength="14"
+                       inputmode="text"
+                       required />
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <rect x="3" y="6" width="18" height="13" rx="2"/>
+                  <path d="M3 10h18M8 6V4M16 6V4"/>
+                </svg>
+              </div>
+            </div>
+
+            <div class="error-msg" id="error-otc" role="alert"></div>
+
+            <button type="submit" class="btn" id="submit-otc">
+              <span class="btn-text">Verify Code</span>
+              <div class="spinner"></div>
+            </button>
+          </form>
+        </div>
+
+      </div><!-- /panels -->
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

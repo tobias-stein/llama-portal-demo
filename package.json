@@ -1,0 +1,35 @@
+{
+  "name": "llama-portal",
+  "version": "1.0.0",
+  "description": "A booking and admin interface for the Llama Portal, bundled with Webpack.",
+  "private": true,
+  "scripts": {
+    "start": "webpack serve --mode development",
+    "build": "webpack --mode production"
+  },
+  "keywords": [
+    "html",
+    "css",
+    "javascript",
+    "frontend",
+    "webpack",
+    "aws-sdk"
+  ],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "copy-webpack-plugin": "^12.0.2",
+    "html-webpack-plugin": "^5.6.0",
+    "webpack": "^5.91.0",
+    "webpack-cli": "^5.1.4",
+    "webpack-dev-server": "^5.0.4"
+  },
+  "dependencies": {
+    "@aws-sdk/client-cognito-identity-provider": "^3.540.0",
+    "@aws-sdk/client-dynamodb": "^3.1004.0",
+    "@aws-sdk/client-lambda": "^3.540.0",
+    "@aws-sdk/credential-providers": "^3.540.0",
+    "@aws-sdk/lib-dynamodb": "^3.1004.0",
+    "amazon-cognito-identity-js": "^6.3.1"
+  }
+}

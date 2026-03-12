@@ -1,0 +1,425 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Serverless multi-tenant Booking System Infrastructure (Always Free Tier).
+
+Parameters:
+  TenantName:
+    Type: String
+    Default: "TenantA"
+
+Resources:
+  # ==========================================
+  # DYNAMODB TABLE (PROVISIONED for Free Tier)
+  # ==========================================
+  BookingTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "${TenantName}-BookingTable"
+      BillingMode: PROVISIONED
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1
+      AttributeDefinitions:
+        - AttributeName: "PK"
+          AttributeType: "S"
+        - AttributeName: "SK"
+          AttributeType: "S"
+        - AttributeName: "GSI1PK"
+          AttributeType: "S"
+        - AttributeName: "GSI1SK"
+          AttributeType: "S"
+        - AttributeName: "GSI2PK"
+          AttributeType: "S"
+        - AttributeName: "GSI2SK"
+          AttributeType: "S"
+      KeySchema:
+        - AttributeName: "PK"
+          KeyType: "HASH"
+        - AttributeName: "SK"
+          KeyType: "RANGE"
+      GlobalSecondaryIndexes:
+        - IndexName: "GSI1"
+          KeySchema:
+            - AttributeName: "GSI1PK"
+              KeyType: "HASH"
+            - AttributeName: "GSI1SK"
+              KeyType: "RANGE"
+          Projection:
+            ProjectionType: "ALL"
+          ProvisionedThroughput:
+            ReadCapacityUnits: 1
+            WriteCapacityUnits: 1
+        - IndexName: "GSI2"
+          KeySchema:
+            - AttributeName: "GSI2PK"
+              KeyType: "HASH"
+            - AttributeName: "GSI2SK"
+              KeyType: "RANGE"
+          Projection:
+            ProjectionType: "ALL"
+          ProvisionedThroughput:
+            ReadCapacityUnits: 1
+            WriteCapacityUnits: 1
+      TimeToLiveSpecification:
+        AttributeName: "ttl"
+        Enabled: true
+
+  # ==========================================
+  # COGNITO USER POOL & CLIENT
+  # ==========================================
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub "${TenantName}-UserPool"
+      LambdaConfig:
+        DefineAuthChallenge: !GetAtt DefineAuthChallengeFunction.Arn
+        CreateAuthChallenge: !GetAtt CreateAuthChallengeFunction.Arn
+        VerifyAuthChallengeResponse: !GetAtt VerifyAuthChallengeFunction.Arn
+
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: !Sub "${TenantName}-FrontendApp"
+      UserPoolId: !Ref UserPool
+      GenerateSecret: false
+      ExplicitAuthFlows:
+        - ALLOW_CUSTOM_AUTH
+        - ALLOW_USER_SRP_AUTH
+        - ALLOW_USER_PASSWORD_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+
+  # ==========================================
+  # COGNITO GROUPS & IDENTITY POOL
+  # ==========================================
+  AdminUserGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: "admin"
+      UserPoolId: !Ref UserPool
+      RoleArn: !GetAtt AdminRole.Arn
+      Precedence: 1
+
+  GuestUserGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: "guest"
+      UserPoolId: !Ref UserPool
+      RoleArn: !GetAtt GuestRole.Arn
+      Precedence: 2
+
+  IdentityPool:
+    Type: AWS::Cognito::IdentityPool
+    Properties:
+      IdentityPoolName: !Sub "${TenantName}IdentityPool"
+      AllowUnauthenticatedIdentities: true
+      CognitoIdentityProviders:
+        - ClientId: !Ref UserPoolClient
+          ProviderName: !GetAtt UserPool.ProviderName
+
+  IdentityPoolRoleAttachment:
+    Type: AWS::Cognito::IdentityPoolRoleAttachment
+    Properties:
+      IdentityPoolId: !Ref IdentityPool
+      Roles:
+        unauthenticated: !GetAtt AnonymousGuestRole.Arn
+      RoleMappings:
+        UserPoolMapping:
+          Type: Token
+          AmbiguousRoleResolution: AuthenticatedRole
+          IdentityProvider: !Sub "cognito-idp.${AWS::Region}.amazonaws.com/${UserPool}:${UserPoolClient}"
+
+  # ==========================================
+  # IAM ROLES
+  # ==========================================
+  AnonymousGuestRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${TenantName}-anonymous-guest-role"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: cognito-identity.amazonaws.com
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                "cognito-identity.amazonaws.com:aud": !Ref IdentityPool
+              ForAnyValue:StringLike:
+                "cognito-identity.amazonaws.com:amr": unauthenticated
+      Policies:
+        - PolicyName: AnonymousBookingStatusAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: dynamodb:GetItem
+                Resource: !GetAtt BookingTable.Arn
+                Condition:
+                  ForAllValues:StringLike:
+                    "dynamodb:LeadingKeys": ["BOOKING#*"]
+              - Effect: Allow
+                Action: dynamodb:Query
+                Resource: !Sub "${BookingTable.Arn}/index/GSI2"
+
+  GuestRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${TenantName}-guest-role"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: cognito-identity.amazonaws.com
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                "cognito-identity.amazonaws.com:aud": !Ref IdentityPool
+              ForAnyValue:StringLike:
+                "cognito-identity.amazonaws.com:amr": authenticated
+      Policies:
+        - PolicyName: GuestBookingAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [dynamodb:BatchGetItem, dynamodb:GetItem, dynamodb:Query]
+                Resource:
+                  - !GetAtt BookingTable.Arn
+                  - !Sub "${BookingTable.Arn}/index/GSI1"
+                  - !Sub "${BookingTable.Arn}/index/GSI2"
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource: !GetAtt BookingRequestFunction.Arn
+
+  AdminRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${TenantName}-admin-role"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: cognito-identity.amazonaws.com
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                "cognito-identity.amazonaws.com:aud": !Ref IdentityPool
+              ForAnyValue:StringLike:
+                "cognito-identity.amazonaws.com:amr": authenticated
+      Policies:
+        - PolicyName: AdminBookingAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [dynamodb:BatchGetItem, dynamodb:GetItem, dynamodb:Query, dynamodb:UpdateItem, dynamodb:BatchWriteItem]
+                Resource:
+                  - !GetAtt BookingTable.Arn
+                  - !Sub "${BookingTable.Arn}/index/GSI1"
+                  - !Sub "${BookingTable.Arn}/index/GSI2"
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource:
+                  - !GetAtt ManageBookingsFunction.Arn
+                  - !GetAtt MoveAllocationsFunction.Arn
+                  - !GetAtt GenerateInvitationCodeFunction.Arn
+                  - !GetAtt ManageRoomsFunction.Arn
+
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: 
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: DynamoDBAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [dynamodb:PutItem, dynamodb:UpdateItem, dynamodb:DeleteItem, dynamodb:GetItem, dynamodb:Query, dynamodb:Scan, dynamodb:BatchWriteItem]
+                Resource: 
+                  - !GetAtt BookingTable.Arn
+                  - !Sub "${BookingTable.Arn}/index/*"
+
+  # ==========================================
+  # COGNITO USERS & GROUP ATTACHMENTS
+  # ==========================================
+  AdminUser:
+    Type: AWS::Cognito::UserPoolUser
+    Properties:
+      Username: "admin"
+      UserPoolId: !Ref UserPool
+      MessageAction: SUPPRESS
+
+  GuestUser:
+    Type: AWS::Cognito::UserPoolUser
+    Properties:
+      Username: "guest"
+      UserPoolId: !Ref UserPool
+      MessageAction: SUPPRESS
+
+  AdminUserToAdminGroup:
+    Type: AWS::Cognito::UserPoolUserToGroupAttachment
+    DependsOn: [AdminUser, AdminUserGroup]
+    Properties:
+      GroupName: !Ref AdminUserGroup
+      Username: !Ref AdminUser
+      UserPoolId: !Ref UserPool
+
+  GuestUserToGuestGroup:
+    Type: AWS::Cognito::UserPoolUserToGroupAttachment
+    DependsOn: [GuestUser, GuestUserGroup]
+    Properties:
+      GroupName: !Ref GuestUserGroup
+      Username: !Ref GuestUser
+      UserPoolId: !Ref UserPool
+      
+  # ==========================================
+  # LAMBDA FUNCTIONS (Dummy code for deployment)
+  # ==========================================
+  ManageRoomsFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${TenantName}-manage-rooms"
+      Runtime: nodejs24.x
+      Handler: manage-rooms.handler
+      Timeout: 60
+      Environment: 
+        Variables: 
+          TABLE_NAME: !Ref BookingTable                     # <-- Pass the Table Name
+          MANAGE_BOOKINGS_FUNCTION: !Ref ManageBookingsFunction # <-- Pass the Python Lambda Name
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        ZipFile: "exports.handler = async (event) => {};"
+
+  ManageBookingsFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${TenantName}-manage-bookings"
+      Runtime: python3.14
+      Handler: manage-bookings.lambda_handler
+      Timeout: 60
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref BookingTable
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        ZipFile: "def lambda_handler(event, context): return {'statusCode': 200}"
+
+  MoveAllocationsFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${TenantName}-move-allocations"
+      Runtime: python3.14
+      Handler: move-allocations.lambda_handler
+      Timeout: 60
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref BookingTable
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        ZipFile: "def lambda_handler(event, context): return {'statusCode': 200}"
+
+  BookingRequestFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${TenantName}-booking-request"
+      Runtime: python3.14
+      Timeout: 60
+      Handler: booking-request.lambda_handler
+      Environment: 
+        Variables: 
+          TABLE_NAME: !Ref BookingTable
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        ZipFile: "def lambda_handler(e, c): return {'statusCode': 200}"
+
+  DefineAuthChallengeFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${TenantName}-define-auth-challenge"
+      Runtime: nodejs24.x
+      Handler: define-auth-challenge.handler
+      Environment: { Variables: { TABLE_NAME: !Ref BookingTable } }
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        ZipFile: "exports.handler = async (event) => { return event; };"
+
+  CreateAuthChallengeFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${TenantName}-create-auth-challenge"
+      Runtime: nodejs24.x
+      Handler: create-auth-challenge.handler
+      Environment: { Variables: { TABLE_NAME: !Ref BookingTable } }
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        ZipFile: "exports.handler = async (event) => { return event; };"
+
+  VerifyAuthChallengeFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${TenantName}-verify-invitation-code"
+      Runtime: nodejs24.x
+      Handler: verify-invitation-code.handler
+      Environment: { Variables: { TABLE_NAME: !Ref BookingTable } }
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        ZipFile: "exports.handler = async (event) => { return event; };"
+
+  GenerateInvitationCodeFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${TenantName}-generate-invitation-code"
+      Runtime: nodejs24.x
+      Handler: generate-invitation-code.handler
+      Environment: 
+        Variables: 
+          TABLE_NAME: !Ref BookingTable    # <-- Pass the Table Name
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        ZipFile: "exports.handler = async (event) => {};"
+         
+  # Lambda Triggers for Cognito
+  InvokeDefineAuthChallengePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref DefineAuthChallengeFunction
+      Principal: cognito-idp.amazonaws.com
+      SourceArn: !GetAtt UserPool.Arn
+
+  InvokeCreateAuthChallengePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref CreateAuthChallengeFunction
+      Principal: cognito-idp.amazonaws.com
+      SourceArn: !GetAtt UserPool.Arn
+
+  InvokeVerifyAuthChallengePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref VerifyAuthChallengeFunction
+      Principal: cognito-idp.amazonaws.com
+      SourceArn: !GetAtt UserPool.Arn
+
+Outputs:
+  CognitoUserPoolId:
+    Value: !Ref UserPool
+  CognitoClientId:
+    Value: !Ref UserPoolClient
+  CognitoIdentityPoolId:
+    Value: !Ref IdentityPool
+  DynamoTableName:
+    Value: !Ref BookingTable
