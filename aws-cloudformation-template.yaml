@@ -214,7 +214,7 @@ Resources:
             Version: "2012-10-17"
             Statement:
               - Effect: Allow
-                Action: [dynamodb:BatchGetItem, dynamodb:GetItem, dynamodb:Query, dynamodb:UpdateItem, dynamodb:BatchWriteItem]
+                Action: [dynamodb:BatchGetItem, dynamodb:GetItem, dynamodb:Query]
                 Resource:
                   - !GetAtt BookingTable.Arn
                   - !Sub "${BookingTable.Arn}/index/GSI1"
